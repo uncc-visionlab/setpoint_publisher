@@ -2,6 +2,7 @@ from math import sqrt
 from time import sleep
 import rospy
 import tf
+import tf2_ros
 from geometry_msgs.msg import TransformStamped
 
 class SetpointPublisher:
@@ -17,6 +18,7 @@ class SetpointPublisher:
         self.setpoints = self.getSetpointsFromFile(setpoints_file_path)
         setpoint_topic = rospy.get_param('~setpoint_topic', 'setpoints')
         self.setpoint_pub = rospy.Publisher(setpoint_topic, TransformStamped, queue_size=10)
+        self.updateSetpointMsg()
         
         init_time = rospy.get_param('~init_time', 0)
         sleep(init_time)
@@ -25,7 +27,7 @@ class SetpointPublisher:
             self.tfparent_frame = rospy.get_param('~tfparent_frame')
             self.tfchild_frame = rospy.get_param('~tfchild_frame')
             self.tflistener = tf.TransformListener()
-            self.tfbroadcaster = tf.TransformBroadcaster()
+            self.tfbroadcaster = tf2_ros.TransformBroadcaster()
         else:
             pose_topic = rospy.get_param('~pose_topic')
             self.pose_sub = rospy.Subscriber(pose_topic, TransformStamped, self.callback)
@@ -55,8 +57,6 @@ class SetpointPublisher:
 
     def updateSetpointMsg(self):
         active_setpoint = self.setpoints[self.setpoint_index]
-        self.setpoint_msg.header.frame_id = self.setpoint_frame
-        self.setpoint_msg.child_frame_id = "setpoint"
         self.setpoint_msg.transform.translation.x = active_setpoint[0]
         self.setpoint_msg.transform.translation.y = active_setpoint[1]
         self.setpoint_msg.transform.translation.z = active_setpoint[2]
@@ -78,16 +78,18 @@ class SetpointPublisher:
                 return
             self.evaluate(position)
         else:
-            raise RuntimeError('No tf::Listener has been instantiated!')
+            raise RuntimeError('No tf listener has been instantiated!')
 
     def publishSetpoint(self):
-        right_now = rospy.Time.now()
-        self.setpoint_msg.header.stamp = right_now
+        self.setpoint_msg.header.stamp = rospy.Time.now()
+        self.setpoint_msg.header.frame_id = self.setpoint_frame
+        self.setpoint_msg.child_frame_id = "setpoint"
         self.setpoint_pub.publish(self.setpoint_msg)
 
-        if self.use_tf:
-            active_setpoint = self.setpoints[self.setpoint_index]
-            self.tfbroadcaster.sendTransform(active_setpoint[0:3], active_setpoint[3:], right_now, 'setpoint', self.setpoint_frame)
+        if self.tfbroadcaster:
+            self.tfbroadcaster.sendTransform(self.setpoint_msg)
+        else:
+            raise RuntimeError('No tf broadcaster has been instantiated!')
 
     def run(self):
         while not rospy.is_shutdown():
