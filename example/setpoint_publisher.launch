@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+    
+    <arg name="run_setpoint_publisher" default="true"/>
+    
+    <node pkg="setpoint_publisher" type="setpoint_publisher" name="setpoint_publisher" output="screen" 
+          if="$(arg run_setpoint_publisher)">
+        <param name="inittime" value="0"/>
+        <param name="setpoint_topic" value="setpoints"/>
+        <param name="setpoints_file_path" value="$(find setpoint_publisher)/example/setpoints.txt"/>
+        <param name="setpoint_radius" value="0.1"/>
+        <param name="use_tf" value="true"/>
+        <param name="tfparent_frame" value="world"/>
+        <param name="tfchild_frame" value="bot"/>
+        <param name="pose_topic" value="pose"/> <!-- not needed if using tf -->
+    </node>
+    
+</launch>
