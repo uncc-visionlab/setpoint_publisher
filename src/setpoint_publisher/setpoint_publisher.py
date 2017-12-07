@@ -38,13 +38,13 @@ class SetpointPublisher:
         return distance
 
     def evaluate(self, current_position):
-        active_setpoint = this.setpoints[self.setpoint_index]
+        active_setpoint = self.setpoints[self.setpoint_index]
 
         if self.distance(current_position, active_setpoint[0:3]) < self.setpoint_radius:
             if self.setpoint_index < len(self.setpoints)-1:
                 self.changeActiveSetpoint(self.setpoint_index + 1)
                 self.updateSetpointMsg()
-                rospy.logdebug(rospy.get_name() + ' setpoint changed to: ' + str(self.setpoints[self.setpoint_index]))        
+                rospy.logdebug(rospy.get_name() + ' setpoint changed to: ' + str(self.setpoints[self.setpoint_index]))
 
     def changeActiveSetpoint(self, new_index):
         self.setpoint_index = new_index
