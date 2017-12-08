@@ -74,7 +74,6 @@ class SetpointPublisher:
         self.evaluate(current_position)
 
     def updateUsingTF(self):
-        if self.tflistener:
             try:
                 transform_msg = self.tfbuffer.lookup_transform(self.tfparent_frame, self.tfchild_frame, rospy.Time(0))
                 position = [
@@ -84,17 +83,13 @@ class SetpointPublisher:
             except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
                 return
             self.evaluate(position)
-        else:
-            raise RuntimeError('No tf listener has been instantiated!')
 
     def publishSetpoint(self):
         self.setpoint_msg.header.stamp = rospy.Time.now()
         self.setpoint_pub.publish(self.setpoint_msg)
 
-        if self.tfbroadcaster:
+        if self.use_tf:
             self.tfbroadcaster.sendTransform(self.setpoint_msg)
-        else:
-            raise RuntimeError('No tf broadcaster has been instantiated!')
 
     def run(self):
         while not rospy.is_shutdown():
