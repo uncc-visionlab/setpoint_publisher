@@ -7,15 +7,16 @@ from geometry_msgs.msg import TransformStamped
 class SetpointPublisher:
 
     def __init__(self):
-        self.setpoint_index = 0
-        self.setpoint_radius = rospy.get_param('~setpoint_radius', 0.1) # meters
-        self.use_tf = rospy.get_param('~use_tf', True)
+        self.setpoint_index = 0 
         self.setpoint_frame = rospy.get_param('~setpoint_frame')
+        self.setpoint_radius = rospy.get_param('~setpoint_radius') # meters
+        self.use_tf = rospy.get_param('~use_tf', True)
 
         setpoints_file_path = rospy.get_param('~setpoints_file_path')
         self.setpoints = self.getSetpointsFromFile(setpoints_file_path)
         setpoint_topic = rospy.get_param('~setpoint_topic', 'setpoints')
         self.setpoint_pub = rospy.Publisher(setpoint_topic, TransformStamped, queue_size=10)
+        self.tfbroadcaster = tf2_ros.TransformBroadcaster()
 
         self.setpoint_msg = TransformStamped()
         self.setpoint_msg.header.frame_id = self.setpoint_frame
@@ -24,13 +25,12 @@ class SetpointPublisher:
         
         init_time = rospy.get_param('~init_time', 0)
         sleep(init_time)
-        
+
         if self.use_tf:
             self.tfparent_frame = rospy.get_param('~tfparent_frame')
             self.tfchild_frame = rospy.get_param('~tfchild_frame')
             self.tfbuffer = tf2_ros.Buffer(cache_time = rospy.Duration(1))
             self.tflistener = tf2_ros.TransformListener(self.tfbuffer)
-            self.tfbroadcaster = tf2_ros.TransformBroadcaster()
         else:
             pose_topic = rospy.get_param('~pose_topic')
             self.pose_sub = rospy.Subscriber(pose_topic, TransformStamped, self.callback)
@@ -45,6 +45,16 @@ class SetpointPublisher:
         distance = sqrt(sum([(a - b)**2 for a, b in zip(current_position, setpoint_position)]))
         rospy.logdebug_throttle(.5, rospy.get_name() + ': client is ' + str(distance) + ' m away from target.')
         return distance
+    
+    def distanceXY(self, current_position, setpoint_position):
+        return self.distance(
+            [current_position[0], current_position[1]], 
+            [setpoint_position[0], setpoint_position[1]])
+
+    def distanceXZ(self, current_position, setpoint_position):
+        return self.distance(
+            [current_position[0], current_position[2]], 
+            [setpoint_position[0], setpoint_position[2]])
 
     def evaluate(self, current_position):
         active_setpoint = self.setpoints[self.setpoint_index]
@@ -88,7 +98,7 @@ class SetpointPublisher:
         self.setpoint_msg.header.stamp = rospy.Time.now()
         self.setpoint_pub.publish(self.setpoint_msg)
 
-        if self.use_tf:
+        if hasattr(self, 'tfbroadcaster'):
             self.tfbroadcaster.sendTransform(self.setpoint_msg)
 
     def run(self):
