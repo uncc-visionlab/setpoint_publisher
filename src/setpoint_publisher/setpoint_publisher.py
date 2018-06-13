@@ -3,11 +3,11 @@ from time import sleep
 import rospy
 import tf2_ros
 from geometry_msgs.msg import TransformStamped
+from std_msgs.msg import Bool
 
 class SetpointPublisher:
 
     def __init__(self):
-        self.done = False
         self.setpoint_index = 0 
         self.setpoint_frame = rospy.get_param('~setpoint_frame')
         self.setpoint_radius = rospy.get_param('~setpoint_radius') # meters
@@ -27,12 +27,19 @@ class SetpointPublisher:
         init_time = rospy.get_param('~init_time', 0)
         sleep(init_time)
 
+        self.has_setpoints = Bool()
+        self.has_setpoints.data = len(self.setpoints) > 0
+        has_setpoints_topic = rospy.get_param('~has_setpoints_topic', 'has_setpoints')
+        self.has_setpoints_pub = rospy.Publisher(has_setpoints_topic, Bool, queue_size=10)        
+
         if self.use_tf:
             self.tfparent_frame = rospy.get_param('~tfparent_frame')
             self.tfchild_frame = rospy.get_param('~tfchild_frame')
             self.tfbuffer = tf2_ros.Buffer(cache_time = rospy.Duration(1))
             self.tflistener = tf2_ros.TransformListener(self.tfbuffer)
             self.nav_pose_msg = TransformStamped()
+            self.nav_pose_msg.header.frame_id = self.tfparent_frame
+            self.nav_pose_msg.child_frame_id = self.tfchild_frame
             nav_pose_out_topic = rospy.get_param('~nav_pose_out_topic', 'nav_pose')
             self.nav_pose_out_pub = rospy.Publisher(nav_pose_out_topic, TransformStamped, queue_size=10);
         else:
@@ -47,7 +54,8 @@ class SetpointPublisher:
 
     def distance(self, current_position, setpoint_position):
         distance = sqrt(sum([(a - b)**2 for a, b in zip(current_position, setpoint_position)]))
-        rospy.logdebug_throttle(.5, rospy.get_name() + ': client is ' + str(distance) + ' m away from target.')
+        if self.has_setpoints.data:
+            rospy.logdebug_throttle(.5, rospy.get_name() + ': client is ' + str(distance) + ' m away from target.')
         return distance
     
     def distanceXY(self, current_position, setpoint_position):
@@ -69,12 +77,14 @@ class SetpointPublisher:
                 self.updateSetpointMsg()
                 rospy.logdebug(rospy.get_name() + ' setpoint changed to: ' + str(self.setpoints[self.setpoint_index]))
             else:
-                self.nav_pose_msg.header.frame_id = "Path_Complete"
-                self.nav_pose_msg.child_frame_id = "Path_Complete"
-                self.nav_pose_msg.header.stamp = rospy.Time.now()                
-                self.nav_pose_out_pub.publish(self.nav_pose_msg)
-                self.done = True
+                self.publishHasSetpoints()
+                if self.has_setpoints.data:
+                    self.has_setpoints.data = False
+                    rospy.logdebug(rospy.get_name() + ': client has achieved the last setpoint.')
+                    rospy.signal_shutdown(rospy.get_name() + ': client has achieved the last setpoint.')
 
+    def publishHasSetpoints(self):
+        self.has_setpoints_pub.publish(self.has_setpoints)
 
     def changeActiveSetpoint(self, new_index):
         self.setpoint_index = new_index
@@ -92,7 +102,19 @@ class SetpointPublisher:
     def callback(self, msg):
         translation = msg.transform.translation
         current_position = [translation.x, translation.y, translation.z]
+        self.publishNavPose(msg)
         self.evaluate(current_position)
+
+    def publishNavPose(self, transform_msg):
+        self.nav_pose_msg.transform.translation.x = transform_msg.transform.translation.x
+        self.nav_pose_msg.transform.translation.y = transform_msg.transform.translation.y
+        self.nav_pose_msg.transform.translation.z = transform_msg.transform.translation.z
+        self.nav_pose_msg.transform.rotation.x = transform_msg.transform.rotation.x
+        self.nav_pose_msg.transform.rotation.y = transform_msg.transform.rotation.y
+        self.nav_pose_msg.transform.rotation.z = transform_msg.transform.rotation.z
+        self.nav_pose_msg.transform.rotation.w = transform_msg.transform.rotation.w
+        self.nav_pose_msg.header.stamp = rospy.Time.now()                
+        self.nav_pose_out_pub.publish(self.nav_pose_msg)
 
     def updateUsingTF(self):
             try:
@@ -100,18 +122,8 @@ class SetpointPublisher:
                 position = [
                     transform_msg.transform.translation.x, 
                     transform_msg.transform.translation.y, 
-                    transform_msg.transform.translation.z]                
-                self.nav_pose_msg.transform.translation.x = transform_msg.transform.translation.x
-                self.nav_pose_msg.transform.translation.y = transform_msg.transform.translation.y
-                self.nav_pose_msg.transform.translation.z = transform_msg.transform.translation.z
-                self.nav_pose_msg.transform.rotation.x = transform_msg.transform.rotation.x
-                self.nav_pose_msg.transform.rotation.y = transform_msg.transform.rotation.y
-                self.nav_pose_msg.transform.rotation.z = transform_msg.transform.rotation.z
-                self.nav_pose_msg.transform.rotation.w = transform_msg.transform.rotation.w
-                self.nav_pose_msg.header.frame_id = self.tfparent_frame
-                self.nav_pose_msg.child_frame_id = self.tfchild_frame
-                self.nav_pose_msg.header.stamp = rospy.Time.now()                
-                self.nav_pose_out_pub.publish(self.nav_pose_msg)
+                    transform_msg.transform.translation.z]   
+                self.publishNavPose(transform_msg)
                 self.evaluate(position)
             except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
                 return
@@ -124,12 +136,17 @@ class SetpointPublisher:
             self.tfbroadcaster.sendTransform(self.setpoint_msg)
 
     def run(self):
-        while (not rospy.is_shutdown()) and (not self.done):
-            if self.use_tf:
-                self.updateUsingTF()
-
-            self.publishSetpoint()
-            rospy.Rate(100).sleep()
+            while not rospy.is_shutdown():
+                if self.use_tf:
+                    self.updateUsingTF()
+                self.publishHasSetpoints()
+                if self.has_setpoints.data:
+                    self.publishSetpoint()
+                try:
+                    rospy.Rate(10).sleep()
+                except (rospy.exceptions.ROSInterruptException, KeyboardInterrupt) as err:
+                    rospy.logout(rospy.get_name() + err)
+                    pass
 
 if __name__ == '__main__':
 

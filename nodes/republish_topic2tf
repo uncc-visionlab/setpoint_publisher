@@ -1,0 +1,10 @@
+#!/usr/bin/env python2
+
+import rospy
+from setpoint_publisher.republish_topic2tf import RepublishTopic2TF
+
+if __name__ == '__main__':
+
+    rospy.init_node('republish_topic2tf', log_level=rospy.DEBUG, disable_signals=True)
+    republisher = RepublishTopic2TF()
+    republisher.run()

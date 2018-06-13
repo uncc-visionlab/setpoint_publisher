@@ -7,7 +7,8 @@ project(setpoint_publisher)
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
-find_package(catkin REQUIRED COMPONENTS
+find_package(catkin REQUIRED COMPONENTS 
+  std_msgs
   geometry_msgs
   rospy
   tf2_ros
@@ -117,9 +118,13 @@ catkin_package(
 ## Your package locations should be listed before other locations
 include_directories(include ${catkin_INCLUDE_DIRS})
 
-
-
 catkin_install_python(PROGRAMS nodes/setpoint_publisher
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+
+catkin_install_python(PROGRAMS nodes/republish_tf2topic
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+
+catkin_install_python(PROGRAMS nodes/republish_topic2tf
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 ## Declare a C++ library

@@ -5,6 +5,6 @@ from setpoint_publisher.setpoint_publisher import SetpointPublisher
 
 if __name__ == '__main__':
 
-    rospy.init_node('setpoint_publisher', log_level=rospy.DEBUG)
+    rospy.init_node('setpoint_publisher', log_level=rospy.DEBUG, disable_signals=True)
     setpoint_publisher = SetpointPublisher()
     setpoint_publisher.run()
