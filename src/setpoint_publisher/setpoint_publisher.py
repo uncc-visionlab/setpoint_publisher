@@ -7,6 +7,7 @@ from geometry_msgs.msg import TransformStamped
 class SetpointPublisher:
 
     def __init__(self):
+        self.done = False
         self.setpoint_index = 0 
         self.setpoint_frame = rospy.get_param('~setpoint_frame')
         self.setpoint_radius = rospy.get_param('~setpoint_radius') # meters
@@ -22,7 +23,7 @@ class SetpointPublisher:
         self.setpoint_msg.header.frame_id = self.setpoint_frame
         self.setpoint_msg.child_frame_id = "setpoint"
         self.updateSetpointMsg()
-        
+
         init_time = rospy.get_param('~init_time', 0)
         sleep(init_time)
 
@@ -31,6 +32,9 @@ class SetpointPublisher:
             self.tfchild_frame = rospy.get_param('~tfchild_frame')
             self.tfbuffer = tf2_ros.Buffer(cache_time = rospy.Duration(1))
             self.tflistener = tf2_ros.TransformListener(self.tfbuffer)
+            self.nav_pose_msg = TransformStamped()
+            nav_pose_out_topic = rospy.get_param('~nav_pose_out_topic', 'nav_pose')
+            self.nav_pose_out_pub = rospy.Publisher(nav_pose_out_topic, TransformStamped, queue_size=10);
         else:
             pose_topic = rospy.get_param('~pose_topic')
             self.pose_sub = rospy.Subscriber(pose_topic, TransformStamped, self.callback)
@@ -64,6 +68,13 @@ class SetpointPublisher:
                 self.changeActiveSetpoint(self.setpoint_index + 1)
                 self.updateSetpointMsg()
                 rospy.logdebug(rospy.get_name() + ' setpoint changed to: ' + str(self.setpoints[self.setpoint_index]))
+            else:
+                self.nav_pose_msg.header.frame_id = "Path_Complete"
+                self.nav_pose_msg.child_frame_id = "Path_Complete"
+                self.nav_pose_msg.header.stamp = rospy.Time.now()                
+                self.nav_pose_out_pub.publish(self.nav_pose_msg)
+                self.done = True
+
 
     def changeActiveSetpoint(self, new_index):
         self.setpoint_index = new_index
@@ -89,10 +100,21 @@ class SetpointPublisher:
                 position = [
                     transform_msg.transform.translation.x, 
                     transform_msg.transform.translation.y, 
-                    transform_msg.transform.translation.z]
+                    transform_msg.transform.translation.z]                
+                self.nav_pose_msg.transform.translation.x = transform_msg.transform.translation.x
+                self.nav_pose_msg.transform.translation.y = transform_msg.transform.translation.y
+                self.nav_pose_msg.transform.translation.z = transform_msg.transform.translation.z
+                self.nav_pose_msg.transform.rotation.x = transform_msg.transform.rotation.x
+                self.nav_pose_msg.transform.rotation.y = transform_msg.transform.rotation.y
+                self.nav_pose_msg.transform.rotation.z = transform_msg.transform.rotation.z
+                self.nav_pose_msg.transform.rotation.w = transform_msg.transform.rotation.w
+                self.nav_pose_msg.header.frame_id = self.tfparent_frame
+                self.nav_pose_msg.child_frame_id = self.tfchild_frame
+                self.nav_pose_msg.header.stamp = rospy.Time.now()                
+                self.nav_pose_out_pub.publish(self.nav_pose_msg)
+                self.evaluate(position)
             except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
                 return
-            self.evaluate(position)
 
     def publishSetpoint(self):
         self.setpoint_msg.header.stamp = rospy.Time.now()
@@ -102,7 +124,7 @@ class SetpointPublisher:
             self.tfbroadcaster.sendTransform(self.setpoint_msg)
 
     def run(self):
-        while not rospy.is_shutdown():
+        while (not rospy.is_shutdown()) and (not self.done):
             if self.use_tf:
                 self.updateUsingTF()
 
