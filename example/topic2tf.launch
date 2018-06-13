@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+    
+    <arg name="run_setpoint_publisher" default="true"/>
+    
+    <arg name="bot_init_frame_id" default="bot_init"/> 
+    <arg name="bot_frame_id" default="base_link"/> 
+    <arg name="bot_pose_topic" value="bot_nav_pose"/> 
+
+    <node pkg="setpoint_publisher" type="republish_topic2tf" name="truthpose2tf" output="screen" if="$(arg run_setpoint_publisher)">
+        <param name="tfparent_frame" value="$(arg bot_init_frame_id)"/>
+        <param name="tfchild_frame" value="$(arg bot_frame_id)"/>
+        <param name="topic" value="$(arg bot_pose_topic)"/>   
+        <param name="rate" value="5"/>   
+    </node> 
+    
+</launch>
