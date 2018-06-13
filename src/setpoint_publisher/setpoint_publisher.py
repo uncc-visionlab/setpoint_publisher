@@ -145,7 +145,7 @@ class SetpointPublisher:
                 try:
                     rospy.Rate(10).sleep()
                 except (rospy.exceptions.ROSInterruptException, KeyboardInterrupt) as err:
-                    rospy.logout(rospy.get_name() + err)
+                    rospy.logout(rospy.get_name() + ' ' + err.message)
                     pass
 
 if __name__ == '__main__':

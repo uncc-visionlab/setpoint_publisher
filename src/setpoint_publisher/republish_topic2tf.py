@@ -46,7 +46,7 @@ class RepublishTopic2TF:
             try:
                 rospy.Rate(self.rate).sleep()
             except (rospy.exceptions.ROSInterruptException, KeyboardInterrupt) as err:
-                rospy.logout(rospy.get_name() + err)
+                rospy.logout(rospy.get_name() + ' ' + err.message)
                 pass
 
 if __name__ == '__main__':
