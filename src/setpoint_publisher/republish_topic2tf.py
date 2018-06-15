@@ -3,6 +3,7 @@ from time import sleep
 import rospy
 import tf2_ros
 from geometry_msgs.msg import TransformStamped
+from nav_msgs.msg import Odometry
 
 class RepublishTopic2TF:
 
@@ -11,34 +12,49 @@ class RepublishTopic2TF:
         if (self.rate < 5):
             self.rate = 5
         topic = rospy.get_param('~topic', 'topic')
-        self.topic_sub = rospy.Subscriber(topic, TransformStamped, self.callback)
+        topictype = rospy.get_param('~topictype', 'Odometry')
+
+        if topictype.lower() == 'transformstamped':
+            rospy.Subscriber(topic, TransformStamped, self.callback)
+        elif topictype.lower() == 'odometry':
+            rospy.Subscriber(topic, Odometry, self.callback)
+        else:
+            print(rospy.get_name() + ':' + 'Topic type ' + topictype + ' not recognized!\n')
+
         self.tfparent_frame = rospy.get_param('~tfparent_frame')
         self.tfchild_frame = rospy.get_param('~tfchild_frame')
-        self.tf_msg = TransformStamped()
-        self.tf_msg.header.frame_id = self.tfparent_frame
-        self.tf_msg.child_frame_id = self.tfchild_frame
-        self.tf_msg.transform.translation.x = 0
-        self.tf_msg.transform.translation.y = 0
-        self.tf_msg.transform.translation.z = 0
-        self.tf_msg.transform.rotation.x = 0
-        self.tf_msg.transform.rotation.y = 0
-        self.tf_msg.transform.rotation.z = 0
-        self.tf_msg.transform.rotation.w = 1
         self.tfbroadcaster = tf2_ros.TransformBroadcaster()
 
-    def callback(self, transform_msg):
-        self.tf_msg.transform.translation.x = transform_msg.transform.translation.x
-        self.tf_msg.transform.translation.y = transform_msg.transform.translation.y
-        self.tf_msg.transform.translation.z = transform_msg.transform.translation.z
-        self.tf_msg.transform.rotation.x = transform_msg.transform.rotation.x
-        self.tf_msg.transform.rotation.y = transform_msg.transform.rotation.y
-        self.tf_msg.transform.rotation.z = transform_msg.transform.rotation.z
-        self.tf_msg.transform.rotation.w = transform_msg.transform.rotation.w
-        self.topic_msg.header.stamp = rospy.Time.now()                
-        #self.republish()
+    def callback(self, msg):
+        if not hasattr(self, 'tf_msg'):
+            self.tf_msg = TransformStamped()
+            self.tf_msg.header.frame_id = self.tfparent_frame
+            self.tf_msg.child_frame_id = self.tfchild_frame
+
+        if isinstance(msg, TransformStamped):
+            self.tf_msg.transform.translation.x = msg.transform.translation.x
+            self.tf_msg.transform.translation.y = msg.transform.translation.y
+            self.tf_msg.transform.translation.z = msg.transform.translation.z
+            self.tf_msg.transform.rotation.x = msg.transform.rotation.x
+            self.tf_msg.transform.rotation.y = msg.transform.rotation.y
+            self.tf_msg.transform.rotation.z = msg.transform.rotation.z
+            self.tf_msg.transform.rotation.w = msg.transform.rotation.w
+
+        elif isinstance(msg, Odometry):
+            self.tf_msg.transform.translation.x = msg.pose.pose.position.x
+            self.tf_msg.transform.translation.y = msg.pose.pose.position.y
+            self.tf_msg.transform.translation.z = msg.pose.pose.position.z
+            self.tf_msg.transform.rotation.x = msg.pose.pose.orientation.x
+            self.tf_msg.transform.rotation.y = msg.pose.pose.orientation.y
+            self.tf_msg.transform.rotation.z = msg.pose.pose.orientation.z
+            self.tf_msg.transform.rotation.w = msg.pose.pose.orientation.w
+
+        self.tf_msg.header.stamp = rospy.Time.now()                
+        self.republish()
 
     def republish(self):
-        self.tfbroadcaster.sendTransform(self.tf_msg)
+        if hasattr(self, 'tf_msg'):
+            self.tfbroadcaster.sendTransform(self.tf_msg)
 
     def run(self):
         while not rospy.is_shutdown():

@@ -10,6 +10,7 @@ project(setpoint_publisher)
 find_package(catkin REQUIRED COMPONENTS 
   std_msgs
   geometry_msgs
+  nav_msgs
   rospy
   tf2_ros
 )
