@@ -32,16 +32,19 @@ class SetpointPublisher:
         has_setpoints_topic = rospy.get_param('~has_setpoints_topic', 'has_setpoints')
         self.has_setpoints_pub = rospy.Publisher(has_setpoints_topic, Bool, queue_size=10)        
 
+        self.nav_pose_msg = TransformStamped()
+        nav_pose_out_topic = rospy.get_param('~nav_pose_out_topic', 'nav_pose')
+        self.nav_pose_out_pub = rospy.Publisher(nav_pose_out_topic, TransformStamped, queue_size=10);
+        self.nav_pose_msg.header.frame_id = "unknown1"
+        self.nav_pose_msg.child_frame_id = "unknown2"
+
         if self.use_tf:
             self.tfparent_frame = rospy.get_param('~tfparent_frame')
             self.tfchild_frame = rospy.get_param('~tfchild_frame')
             self.tfbuffer = tf2_ros.Buffer(cache_time = rospy.Duration(1))
             self.tflistener = tf2_ros.TransformListener(self.tfbuffer)
-            self.nav_pose_msg = TransformStamped()
             self.nav_pose_msg.header.frame_id = self.tfparent_frame
             self.nav_pose_msg.child_frame_id = self.tfchild_frame
-            nav_pose_out_topic = rospy.get_param('~nav_pose_out_topic', 'nav_pose')
-            self.nav_pose_out_pub = rospy.Publisher(nav_pose_out_topic, TransformStamped, queue_size=10);
         else:
             pose_topic = rospy.get_param('~pose_topic')
             self.pose_sub = rospy.Subscriber(pose_topic, TransformStamped, self.callback)
