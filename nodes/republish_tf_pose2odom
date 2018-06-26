@@ -1,0 +1,10 @@
+#!/usr/bin/env python2
+
+import rospy
+from setpoint_publisher.republish_tf_pose2odom import RepublishTFPose2Odom
+
+if __name__ == '__main__':
+
+    rospy.init_node('republish_tf_pose2odom', log_level=rospy.DEBUG, disable_signals=True)
+    republisher = RepublishTFPose2Odom()
+    republisher.run()

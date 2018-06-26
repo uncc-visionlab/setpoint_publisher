@@ -128,6 +128,9 @@ catkin_install_python(PROGRAMS nodes/republish_tf2topic
 catkin_install_python(PROGRAMS nodes/republish_topic2tf
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
+catkin_install_python(PROGRAMS nodes/republish_tf_pose2odom
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}
 #   src/${PROJECT_NAME}/setpoint_publisher.cpp
